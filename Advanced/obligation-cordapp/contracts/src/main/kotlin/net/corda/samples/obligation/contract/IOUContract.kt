@@ -45,5 +45,10 @@ class IOUContract : Contract {
         require(iouState.amount > Amount.zero(iouState.amount.token)) {
             "A newly issued IOU must have a positive amount."
         }
+        require(iouState.lender != iouState.borrower) { "The lender and borrower cannot have the same identity." }
+        val signers = commandData.signers
+        require(signers.toSet() == iouState.participants.map { it.owningKey }.toSet()) {
+            "Both lender and borrower together only may sign IOU issue transaction."
+        }
     }
 }
