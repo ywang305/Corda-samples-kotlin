@@ -39,6 +39,11 @@ class IOUContract : Contract {
     }
 
     private fun verifyIssuance(tx: LedgerTransaction, commandData: CommandWithParties<Commands>) {
-        //todo
+        require(tx.inputStates.isEmpty()) { "No inputs should be consumed when issuing an IOU." }
+        require(tx.outputStates.size == 1) { "Only one output state should be created when issuing an IOU." }
+        val iouState = tx.outputsOfType<IOUState>().single()
+        require(iouState.amount > Amount.zero(iouState.amount.token)) {
+            "A newly issued IOU must have a positive amount."
+        }
     }
 }
