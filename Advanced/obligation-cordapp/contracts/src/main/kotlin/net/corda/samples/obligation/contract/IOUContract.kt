@@ -23,6 +23,7 @@ class IOUContract : Contract {
      */
     interface Commands : CommandData {
         class Issue : TypeOnlyCommandData(), Commands
+        class Transfer: TypeOnlyCommandData(), Commands
     }
 
     /**
@@ -34,9 +35,11 @@ class IOUContract : Contract {
 
         when (command.value) {
             is Commands.Issue -> verifyIssuance(tx, command)
+            is Commands.Transfer -> verifyTransfer(tx, command)
             else -> throw RuntimeException("Unrecognised command in this contract.")
         }
     }
+
 
     private fun verifyIssuance(tx: LedgerTransaction, commandData: CommandWithParties<Commands>) {
         require(tx.inputStates.isEmpty()) { "No inputs should be consumed when issuing an IOU." }
@@ -50,5 +53,10 @@ class IOUContract : Contract {
         require(signers.toSet() == iouState.participants.map { it.owningKey }.toSet()) {
             "Both lender and borrower together only may sign IOU issue transaction."
         }
+    }
+
+    private fun verifyTransfer(tx: LedgerTransaction, command: CommandWithParties<IOUContract.Commands>) {
+        require(tx.inputStates.size == 1) { "An IOU transfer transaction should only consume one input state." }
+        require(tx.outputStates.size == 1) { "An IOU transfer transaction should only create one output state." }
     }
 }
