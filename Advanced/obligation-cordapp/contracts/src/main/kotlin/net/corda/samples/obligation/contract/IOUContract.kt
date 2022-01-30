@@ -63,6 +63,8 @@ class IOUContract : Contract {
 
     private fun verifySettle(tx: LedgerTransaction, command: CommandWithParties<IOUContract.Commands>) {
         val ious = tx.groupStates<IOUState, UniqueIdentifier> { it.linearId }.single()
-
+        require(ious.inputs.size == 1) {"There must be one input IOU."}
+        val cash = tx.outputsOfType<Cash.State>()
+        require(cash.size == 1) {"There must be output cash."}
     }
 }
