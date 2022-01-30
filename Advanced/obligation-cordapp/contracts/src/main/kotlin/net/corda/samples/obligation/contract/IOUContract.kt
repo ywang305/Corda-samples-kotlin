@@ -62,6 +62,7 @@ class IOUContract : Contract {
     }
 
     private fun verifySettle(tx: LedgerTransaction, command: CommandWithParties<IOUContract.Commands>) {
+        val ious = tx.groupStates<IOUState, UniqueIdentifier> { it.linearId }.single()
 
     }
 }
