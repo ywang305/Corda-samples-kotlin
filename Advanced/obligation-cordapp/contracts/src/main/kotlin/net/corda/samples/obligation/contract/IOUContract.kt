@@ -66,5 +66,26 @@ class IOUContract : Contract {
         require(ious.inputs.size == 1) {"There must be one input IOU."}
         val cash = tx.outputsOfType<Cash.State>()
         require(cash.size == 1) {"There must be output cash."}
+        val inputIou = ious.inputs.single()
+        val acceptableCash = cash.filter { it.owner == inputIou.lender }
+        require(acceptableCash.isNotEmpty()) {"Output cash must be paid to the lender."}
+
+        val sumAcceptableCash = acceptableCash.sumCash().withoutIssuer()
+        val amountOutstanding = inputIou.amount - inputIou.paid
+        requireThat { "The amount settled cannot be more than the amount outstanding." using (amountOutstanding >= sumAcceptableCash) }
+
+        // Check to see if we need an output IOU or not.
+        if (amountOutstanding == sumAcceptableCash) {
+            // If the IOU has been fully settled then there should be no IOU output state.
+            requireThat { "There must be no output IOU as it has been fully settled." using (ious.outputs.isEmpty()) }
+        } else {
+            // If the IOU has been partially settled then it should still exist.
+            requireThat { "There must be one output IOU." using (ious.outputs.size == 1) }
+            // Check only the paid property changes.
+            val outputIou = ious.outputs.single()
+            requireThat { "Only the paid amount can change." using (inputIou.copy(paid = outputIou.paid) == outputIou)}
+
+        }
+
     }
 }

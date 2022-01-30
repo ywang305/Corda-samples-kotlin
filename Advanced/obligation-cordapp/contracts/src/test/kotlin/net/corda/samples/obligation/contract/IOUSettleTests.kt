@@ -258,6 +258,8 @@ class IOUSettleTests {
         val elevenDollars = createCashState(11.DOLLARS, BOB.party)
         val tenDollars = createCashState(10.DOLLARS, BOB.party)
         val fiveDollars = createCashState(5.DOLLARS, BOB.party)
+        val fourDollars = createCashState(4.DOLLARS, BOB.party)
+        val sixDollars = createCashState(6.DOLLARS, BOB.party)
         ledgerServices.ledger {
             transaction {
                 input(IOUContract.IOU_CONTRACT_ID, iou)
@@ -270,10 +272,10 @@ class IOUSettleTests {
             }
             transaction {
                 input(IOUContract.IOU_CONTRACT_ID, iou)
-                input(Cash.PROGRAM_ID, fiveDollars)
-                output(IOUContract.IOU_CONTRACT_ID, iou.pay(5.DOLLARS))
-                output(Cash.PROGRAM_ID, fiveDollars.withNewOwner(newOwner = ALICE.party).ownableState)
-                command(BOB.publicKey, fiveDollars.withNewOwner(newOwner = ALICE.party).command)
+                input(Cash.PROGRAM_ID, fourDollars)
+                output(IOUContract.IOU_CONTRACT_ID, iou.pay(1.DOLLARS))
+                output(Cash.PROGRAM_ID, fourDollars.withNewOwner(newOwner = ALICE.party).ownableState)
+                command(BOB.publicKey, fourDollars.withNewOwner(newOwner = ALICE.party).command)
                 command(listOf(ALICE.publicKey, BOB.publicKey), IOUContract.Commands.Settle())
                 this.verifies()
             }
