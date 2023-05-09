@@ -22,7 +22,9 @@ class IOUContract : Contract {
      * function to check for a number of commands which implement this interface.
      */
     interface Commands : CommandData {
-
+        class Issue : TypeOnlyCommandData(), Commands
+        class Transfer: TypeOnlyCommandData(), Commands
+        class Settle: TypeOnlyCommandData(), Commands
     }
 
     /**
@@ -30,6 +32,60 @@ class IOUContract : Contract {
      * The constraints are self documenting so don't require any additional explanation.
      */
     override fun verify(tx: LedgerTransaction) {
+        val command = tx.commands.requireSingleCommand<Commands>()
+
+        when (command.value) {
+            is Commands.Issue -> verifyIssuance(tx, command)
+            is Commands.Transfer -> verifyTransfer(tx, command)
+            is Commands.Settle -> verifySettle(tx, command)
+            else -> throw RuntimeException("Unrecognised command in this contract.")
+        }
+    }
+
+    private fun verifyIssuance(tx: LedgerTransaction, commandData: CommandWithParties<Commands>) {
+        require(tx.inputStates.isEmpty()) { "No inputs should be consumed when issuing an IOU." }
+        require(tx.outputStates.size == 1) { "Only one output state should be created when issuing an IOU." }
+        val iouState = tx.outputsOfType<IOUState>().single()
+        require(iouState.amount > Amount.zero(iouState.amount.token)) {
+            "A newly issued IOU must have a positive amount."
+        }
+        require(iouState.lender != iouState.borrower) { "The lender and borrower cannot have the same identity." }
+        val signers = commandData.signers
+        require(signers.toSet() == iouState.participants.map { it.owningKey }.toSet()) {
+            "Both lender and borrower together only may sign IOU issue transaction."
+        }
+    }
+
+    private fun verifyTransfer(tx: LedgerTransaction, command: CommandWithParties<IOUContract.Commands>) {
+        require(tx.inputStates.size == 1) { "An IOU transfer transaction should only consume one input state." }
+        require(tx.outputStates.size == 1) { "An IOU transfer transaction should only create one output state." }
+    }
+
+    private fun verifySettle(tx: LedgerTransaction, command: CommandWithParties<IOUContract.Commands>) {
+        val ious = tx.groupStates<IOUState, UniqueIdentifier> { it.linearId }.single()
+        require(ious.inputs.size == 1) {"There must be one input IOU."}
+        val cash = tx.outputsOfType<Cash.State>()
+        require(cash.size == 1) {"There must be output cash."}
+        val inputIou = ious.inputs.single()
+        val acceptableCash = cash.filter { it.owner == inputIou.lender }
+        require(acceptableCash.isNotEmpty()) {"Output cash must be paid to the lender."}
+
+        val sumAcceptableCash = acceptableCash.sumCash().withoutIssuer()
+        val amountOutstanding = inputIou.amount - inputIou.paid
+        requireThat { "The amount settled cannot be more than the amount outstanding." using (amountOutstanding >= sumAcceptableCash) }
+
+        // Check to see if we need an output IOU or not.
+        if (amountOutstanding == sumAcceptableCash) {
+            // If the IOU has been fully settled then there should be no IOU output state.
+            requireThat { "There must be no output IOU as it has been fully settled." using (ious.outputs.isEmpty()) }
+        } else {
+            // If the IOU has been partially settled then it should still exist.
+            requireThat { "There must be one output IOU." using (ious.outputs.size == 1) }
+            // Check only the paid property changes.
+            val outputIou = ious.outputs.single()
+            requireThat { "Only the paid amount can change." using (inputIou.copy(paid = outputIou.paid) == outputIou)}
+
+        }
 
     }
 }
